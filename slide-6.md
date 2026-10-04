@@ -10,12 +10,12 @@
 A script iterates over a C++ container that we expose to it:
 
 ```lua
-for key, value in pairs(HTTP.RequestHeaders) do
+for key, value in pairs(RequestHeaders) do
   print(key, value)
 end
 ```
 <br>
-Since `HTTP.RequestHeaders` is a C++ container pretending to be a Lua table,
+Since `RequestHeaders` is a C++ container pretending to be a Lua table,
 <br>
 we supply our own `next()` function, through the table's `__pairs` metamethod.
 
@@ -60,12 +60,12 @@ int next(lua_State* L) {
 Now we use the template with a container that allows duplicate keys:
 
 ```cpp
-std::multimap<std::string, std::string> headers{
+std::multimap<std::string, std::string> unlucky_headers{
   {"accept", "text/html"},
   {"accept", "application/json"},
   {"host",   "ceph.io"}};
 
-expose(L, "RequestHeaders", headers);   // pairs() will use next<multimap>
+expose(L, "RequestHeaders", unlucky_headers);   // pairs() will use next<multimap>
 ```
 
 ---
@@ -125,7 +125,7 @@ void expose(lua_State* L, const char* name, Map& m);
 
 ```
 error: no matching function for call to 'expose'
-   78 |   expose(L, "RequestHeaders", headers);
+   97 |   expose(L, "RequestHeaders", unlucky_headers);
       |   ^~~~~~
 note: candidate template ignored: constraints not satisfied
       [with Map = std::multimap<std::string, std::string>]

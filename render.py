@@ -15,8 +15,9 @@ Markdown conventions:
   * the first heading of a slide is its title; a "Slide 4.1.2:" prefix is
     dropped, and "(Backup)" in the prefix marks the slide as a backup slide
   * a blockquote starting with "> Notes" holds the speaker notes
-  * the first slide of the first file is the title slide, and the first slide
-    of the last file is the closing slide; both get a photo background
+  * the first slide of the first file is the title slide, with a photo
+    background; the first slide of the last file is a regular slide over a
+    photo; in both files a new line is a line break
 
 In the browser:
     right / space / PageDown   next slide        left / PageUp   previous slide
@@ -178,20 +179,19 @@ def build_slides(files, with_notes=True):
         for slide_index, lines in enumerate(split_slides(path.read_text())):
             lines, notes = extract_notes(lines)
             level, title, tag, body = extract_title(lines)
-            first = slide_index == 0
-            if first and file_index == 0:
+            if slide_index == 0 and file_index == 0:
                 kind = "title"
-            elif first and file_index == len(files) - 1:
-                kind = "closing"
             elif level == 1:
                 kind = "section"
             else:
                 kind = "content"
+            if slide_index == 0 and file_index == len(files) - 1 and kind != "title":
+                kind += " closing"
             slides.append({
                 "kind": kind,
                 "title": title,
                 "tag": tag,
-                "body": render_markdown(body, line_breaks=kind in ("title", "closing")),
+                "body": render_markdown(body, line_breaks=file_index in (0, len(files) - 1)),
                 "notes": render_markdown(notes.splitlines()) if with_notes and notes else "",
                 "source": path.name,
             })
@@ -312,23 +312,24 @@ footer { position: absolute; right: 48px; bottom: 18px; font-size: 14px; color: 
   border-radius: 3px; background: var(--red); }
 .section .fit { font-size: 31px; }
 
-/* title and closing slides: photo background, tinted like the site's hero */
-.title, .closing { justify-content: center; padding: 72px 88px; background-size: cover; background-position: center; }
-.title { background-image: linear-gradient(90deg, hsla(237, 74%, 13%, 0.92) 0%, hsla(237, 74%, 20%, 0.72) 52%,
+/* title slide: photo background, tinted like the site's hero */
+.title { justify-content: center; padding: 72px 88px; background-size: cover; background-position: center;
+  background-image: linear-gradient(90deg, hsla(237, 74%, 13%, 0.92) 0%, hsla(237, 74%, 20%, 0.72) 52%,
   hsla(237, 74%, 25%, 0.25) 100%), var(--photo-title); }
-.closing { background-image: linear-gradient(90deg, hsla(237, 74%, 13%, 0.9) 0%, hsla(237, 74%, 16%, 0.7) 55%,
-  hsla(237, 74%, 25%, 0.2) 100%), var(--photo-closing); }
-.title .logo, .closing .logo { top: 56px; left: 88px; right: auto; width: 168px; }
-.title header, .closing header { padding: 0; }
-.title h1, .closing h1 { font-size: 84px; line-height: 1.05; margin: 0 0 18px; letter-spacing: -0.02em; }
-.title .body, .closing .body { flex: none; overflow: visible; }
+.title .logo { top: 56px; left: 88px; right: auto; width: 168px; }
+.title header { padding: 0; }
+.title h1 { font-size: 84px; line-height: 1.05; margin: 0 0 18px; letter-spacing: -0.02em; }
+.title .body { flex: none; overflow: visible; }
 .title .fit h2 { margin: 0 0 56px; font-size: 34px; font-weight: 400; color: var(--grey-300);
   letter-spacing: 0; text-transform: none; }
 .title .fit h3 { margin: 0 0 10px; font-size: 16px; }
 .title .fit p { font-size: 26px; line-height: 1.5; }
-.closing .fit { font-size: 25px; max-width: 800px; }
-.closing .fit > p:first-child { font-size: 40px; color: var(--red-light); margin-bottom: 1.3em; }
-.title footer, .closing footer { display: none; }
+.title footer { display: none; }
+
+/* closing slide: a regular slide over a photo, darkened so that the text stays readable */
+.closing { background-size: cover; background-position: center;
+  background-image: linear-gradient(90deg, hsla(237, 74%, 13%, 0.94) 0%, hsla(237, 74%, 13%, 0.86) 60%,
+  hsla(237, 74%, 16%, 0.6) 100%), var(--photo-closing); }
 
 /* notes: 'n' shows them under the slide, 'p' opens the presenter window */
 .notes { display: none; }
@@ -374,7 +375,7 @@ JS = r"""
   // shrink the text of a slide until it fits, vertically and horizontally
   function fitSlide(slide) {
     var body = slide.querySelector('.body'), fit = slide.querySelector('.fit');
-    if (!body || !fit || slide.classList.contains('title') || slide.classList.contains('closing')) return;
+    if (!body || !fit || slide.classList.contains('title')) return;
     fit.style.fontSize = '';
     var size = parseFloat(getComputedStyle(fit).fontSize), min = size * 0.5;
     function overflows() {

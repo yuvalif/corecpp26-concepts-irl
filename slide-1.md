@@ -63,7 +63,7 @@ template <lua_metatable MetaTable>
 void create_metatable(lua_State* L);
 ```
 <br>
-The comment became code
+The comment is now code
 
 ---
 

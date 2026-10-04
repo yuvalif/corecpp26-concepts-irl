@@ -37,6 +37,10 @@ errors:
 	-@$(ERROR) -DFORGOT_PAIRS 1_lua_metatable.cc
 	@echo "== 1: missing function, with a concept"
 	-@$(ERROR) -DFORGOT_PAIRS -DUSE_CONCEPT 1_lua_metatable.cc
+	@echo "== 1: non-static function, without a concept"
+	-@$(ERROR) -DNON_STATIC 1_lua_metatable.cc
+	@echo "== 1: non-static function, with a concept"
+	-@$(ERROR) -DNON_STATIC -DUSE_CONCEPT 1_lua_metatable.cc
 	@echo "== 2: enable_if, forgot one '!'"
 	-@$(ERROR) -DFORGOT_NOT 2_serialization_enable_if.cc
 	@echo "== 2: enable_if, a type that cannot be encoded"

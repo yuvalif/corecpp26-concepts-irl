@@ -2,9 +2,11 @@
 //
 // create_metatable() needs four static functions from its template argument.
 //
-//   (default)                      everything is in place: compiles and runs
-//   -DFORGOT_PAIRS                 the error without a concept
-//   -DFORGOT_PAIRS -DUSE_CONCEPT   the error with a concept
+//   (default)          everything is in place: compiles and runs
+//   -DFORGOT_PAIRS     PairsClosure is missing
+//   -DNON_STATIC       PairsClosure is there, but it is not static
+//
+// add -DUSE_CONCEPT to either one to see the same mistake caught by a concept
 
 #include <concepts>
 #include <cstdio>
@@ -44,7 +46,9 @@ struct HTTPRequestHeadersMetaTable {
   static int IndexClosure(lua_State*) { return 0; }
   static int NewIndexClosure(lua_State*) { return 0; }
   static int LenClosure(lua_State*) { return 0; }
-#ifndef FORGOT_PAIRS
+#if defined(NON_STATIC)
+  int PairsClosure(lua_State*) { return 0; }         // oops: needs an object
+#elif !defined(FORGOT_PAIRS)
   static int PairsClosure(lua_State*) { return 0; }
 #endif
 };

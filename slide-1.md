@@ -3,14 +3,13 @@
 * making error messages on templates more human readable
 * giving cool talks in C++ conferences
 
-> Notes: this is where I started. The next slides show the one benefit I
-> believed in, and how small it looked.
-
 ---
 
 ## Slide 1.1: A Template with an Unwritten Contract
 
-Exposing a C++ container to Lua scripts: the library needs four static functions from the type.
+Exposing a C++ container to Lua scripts:
+<br>
+the library needs four static functions from the type
 
 ```cpp
 // lua_utils.h
@@ -27,6 +26,10 @@ void create_metatable(lua_State* L) {
 }
 ```
 
+---
+
+## Slide 1.2: Using the Template for HTTP Request Headers
+
 ```cpp
 // http_request_headers.cc
 #include "lua_utils.h"
@@ -40,12 +43,12 @@ struct HTTPRequestHeadersMetaTable {
 
 create_metatable<HTTPRequestHeadersMetaTable>(L);
 ```
-
-* The contract lives in a comment. The compiler does not read comments.
+<br>
+The contract lives in a comment
 
 ---
 
-## Slide 1.2: The Same Contract, as a Concept
+## Slide 1.3: The Same Contract, as a Concept
 
 ```cpp
 template <typename T>
@@ -59,14 +62,12 @@ concept lua_metatable = requires(lua_State* L) {
 template <lua_metatable MetaTable>
 void create_metatable(lua_State* L);
 ```
-
-* The comment became code: it cannot go stale, and it is checked
+<br>
+The comment became code
 
 ---
 
-## Slide 1.3: The Error Message, Without and With
-
-Without the concept (clang 22):
+## Slide 1.4: The Error Message, without a Concept
 
 ```
 lua_utils.h:8:43: error: no member named 'PairsClosure' in 'HTTPRequestHeadersMetaTable'
@@ -76,7 +77,9 @@ http_request_headers.cc:11:3: note: in instantiation of function template specia
                  'create_metatable<HTTPRequestHeadersMetaTable>' requested here
 ```
 
-With the concept:
+---
+
+## Slide 1.5: The Error Message, with a Concept
 
 ```
 http_request_headers.cc:11:3: error: no matching function for call to 'create_metatable'
@@ -90,7 +93,3 @@ lua_utils.h:9:8: note: because 'T::PairsClosure(L)' would be invalid:
 * The error moved from the library's implementation to **my** line of code
 * It names the contract that was broken, not the statement that happened to trip
 * Nicer. But is it worth touching working code for?
-
-> Notes: in an example this small, the error without the concept is already
-> readable. The gap grows with the depth of the template call chain.
-> That is exactly why the conclusion on the next slides sounds reasonable.

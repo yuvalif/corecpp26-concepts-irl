@@ -1,24 +1,32 @@
-# I Was Somewhat Wrong
+# I Was Somewhat Wrong - Serialization Library
 
-* Better template resolution for our serialization templates
-* Still, only a compile time improvement
+Every Ceph type that goes to disk or over the network is 
+<br>
+serialized with a free function `encode(value, buffer)`,
+<br>
+and that includes any container of any such type.
 
-> Notes: all the context that is needed - every Ceph type that goes to disk or
-> over the network is serialized with a free function `encode(value, buffer)`,
-> and that includes any container of any such type.
-
----
-
-## Slide 4.1: Overload Resolution with `enable_if`
-
-* numeric types
-* self encoding types
-* vectors
-* numeric vectors
+**Template resolution is a mess with `enable_if`**
 
 ---
 
-### Slide 4.1.1: Numeric and Self-Encoding Types
+## Slide 4.1: Detecting a Member Function
+
+```cpp
+// primary template: "no"
+template <typename T, typename = void>
+struct has_encode : std::false_type {};
+
+// specialization: "yes", but only if v.encode(bl) compiles
+template <typename T>
+struct has_encode<T, std::void_t<decltype(
+    std::declval<const T&>().encode(std::declval<bufferlist&>()))>>
+  : std::true_type {};
+```
+
+---
+
+## Slide 4.2: Numeric and Self-Encoding Types
 
 ```cpp
 // numbers: copy the bytes
@@ -28,13 +36,13 @@ encode(const T& v, bufferlist& bl);
 
 // classes that know how to encode themselves
 template <typename T>
-std::enable_if_t<has_encode<T>::value>          // void_t detector, not shown
+std::enable_if_t<has_encode<T>::value>          // the detector from 4.1
 encode(const T& v, bufferlist& bl) { v.encode(bl); }
 ```
 
 ---
 
-### Slide 4.1.2: Vectors
+## Slide 4.3: Vectors
 
 ```cpp
 // vector of anything: one element at a time
@@ -48,7 +56,7 @@ encode(const std::vector<T, A>& v, bufferlist& bl) {
 
 ---
 
-### Slide 4.1.3: Numeric Vectors
+## Slide 4.4: Numeric Vectors
 
 ```cpp
 // vector of numbers: one copy
@@ -62,7 +70,7 @@ encode(const std::vector<T, A>& v, bufferlist& bl);
 
 ---
 
-### Slide 4.1.4: Why It's a Headache
+## Slide 4.5: Why It's a Headache
 
 * Every pair of overloads must be made mutually exclusive **by hand**
 * Forget one `!` and you get: `error: call to 'encode' is ambiguous`
@@ -70,15 +78,7 @@ encode(const std::vector<T, A>& v, bufferlist& bl);
 
 ---
 
-## Slide 4.2: Overload Resolution with Concepts
-
-* Basic encoding concepts
-* Range concepts
-* Encoding ranges
-
----
-
-### Slide 4.2.1: Basic Encoding Concepts
+## Slide 4.6: Basic Encoding Concepts
 
 ```cpp
 template <typename T>
@@ -96,7 +96,7 @@ concept encodable = requires(const T& v, bufferlist& bl) { encode(v, bl); };
 
 ---
 
-### Slide 4.2.2: Range Concepts
+## Slide 4.7: Range Concepts
 
 ```cpp
 template <typename R>
@@ -111,7 +111,7 @@ concept raw_bytes_range =
 
 ---
 
-### Slide 4.2.3: Encoding Ranges
+## Slide 4.8: Encoding Ranges
 
 ```cpp
 // any container of anything encodable: one element at a time
@@ -126,7 +126,7 @@ void encode(const raw_bytes_range auto& r, bufferlist& bl);
 
 ---
 
-### Slide 4.2.4: Why It's a Breeze
+## Slide 4.9: Why It's a Breeze
 
 * No negations: `raw_bytes_range` is *more constrained* than `encodable_range`, so the compiler picks it
 * One loop serves `vector`, `list`, `set`, `map`, ... and containers of containers
@@ -134,7 +134,7 @@ void encode(const raw_bytes_range auto& r, bufferlist& bl);
 
 ---
 
-## Slide 4.3: When a Type Cannot Be Encoded
+## Slide 4.10: Bonus: When a Type Cannot Be Encoded
 
 ```cpp
 struct Tenant { uint64_t id; };            // no encode()
@@ -142,54 +142,10 @@ struct Tenant { uint64_t id; };            // no encode()
 encode(std::vector<Tenant>{}, bl);
 ```
 
----
-
-### Slide 4.3.1: `enable_if`
-
-* the error is inside the library, in the loop:
-
-```
-encoding.h:35:27: error: no matching function for call to 'encode'
-   35 |   for (const auto& e : v) encode(e, bl);
-      |                           ^~~~~~
-note: candidate template ignored: requirement 'has_encode<Tenant, void>::value' was not satisfied
-note: candidate template ignored: could not match 'const std::list<T, A>' against 'const Tenant'
-... one note per overload ...
-```
-
----
-
-### Slide 4.3.2: Concepts
-
-* the error is at my call, in my vocabulary:
-
-```
-tenant.cc:66:3: error: no matching function for call to 'encode'
-   66 |   encode(std::vector<Tenant>{}, bl);
-      |   ^~~~~~
-note: because 'std::vector<Tenant>' does not satisfy 'encodable_range'
-note: because 'Tenant' does not satisfy 'encodable'
-```
-
-> Notes: the messages are trimmed to the relevant lines. In full, the concepts
-> error is not shorter than the `enable_if` one, because every rejected
-> overload now explains itself. The win is where the error points and what it
-> names, not its length.
-
----
-
-### Slide 4.3.3: A Concept Can Be Tested
-
-* right next to the type:
+A concept can be tested right next to the type:
 
 ```cpp
 static_assert(encodable<Tenant>);
 // error: static assertion failed
 // note: because 'Tenant' does not satisfy 'encodable'
 ```
-
-> Notes: a concept is a compile time predicate, so it can be asserted like any
-> other. The error is three lines long.
->
-> Bridge to the next section: still, all of this happens at compile time.
-> The binary is the same.

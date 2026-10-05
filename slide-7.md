@@ -10,9 +10,9 @@ expose internal types to scripts running inside Ceph's Object Store frontend
 
 ---
 
-## Slide 7.1: Powerful Solution without Adding Complexity
+## Slide 7.1: Non-Intrusive Solution
 <br>
-#### The class hierarchy says what a type ***is***, A concept says what we can ***do*** with it
+#### The class hierarchy says what a type ***is***. A concept says what we can ***do*** with it
 <br>
-#### The types did not change. No base class was added, no type was touched
+#### The types did not change. No base class was added. No type was touched
 

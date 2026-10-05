@@ -15,8 +15,11 @@ Markdown conventions:
   * the first heading of a slide is its title; a "Slide 4.1.2:" prefix is
     dropped, and "(Backup)" in the prefix marks the slide as a backup slide
   * a blockquote starting with "> Notes" holds the speaker notes
+  * <img src="local file"> is embedded in the output; inside
+    <figure class="qr"> it is placed on the right side of the slide, with
+    its <figcaption> below it
   * the first slide of the first file is the title slide, with a photo
-    background; the first slide of the last file is a regular slide over a
+    background; the last slide of the last file is a regular slide over a
     photo; in both files a new line is a line break
 
 In the browser:
@@ -159,7 +162,8 @@ def render_markdown(lines, line_breaks=False):
             blocks.append(render_code("\n".join(code), lang))
         else:
             line = STRIKE.sub(r"<del>\1</del>", lines[i])
-            text.append(BARE_URL.sub(r"<\1>", line))
+            # bare URLs become links, except inside a line of raw HTML
+            text.append(line if line.lstrip().startswith("<") else BARE_URL.sub(r"<\1>", line))
             i += 1
     extensions = ["tables", "sane_lists"] + (["nl2br"] if line_breaks else [])
     out = markdown.markdown("\n".join(text), extensions=extensions)
@@ -185,16 +189,17 @@ def build_slides(files, with_notes=True):
                 kind = "section"
             else:
                 kind = "content"
-            if slide_index == 0 and file_index == len(files) - 1 and kind != "title":
-                kind += " closing"
             slides.append({
                 "kind": kind,
                 "title": title,
                 "tag": tag,
-                "body": render_markdown(body, line_breaks=file_index in (0, len(files) - 1)),
+                "body": embed_images(
+                    render_markdown(body, line_breaks=file_index in (0, len(files) - 1)), path.parent),
                 "notes": render_markdown(notes.splitlines()) if with_notes and notes else "",
                 "source": path.name,
             })
+    if len(slides) > 1:
+        slides[-1]["kind"] += " closing"  # the last slide of the talk
     return slides
 
 
@@ -216,6 +221,22 @@ def slide_html(slide, number, total, logo):
 
 def data_uri(path, mime):
     return f"data:{mime};base64,{base64.b64encode(path.read_bytes()).decode()}"
+
+
+IMAGE_TYPES = {".svg": "image/svg+xml", ".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg"}
+
+
+def embed_images(text, directory):
+    """Replace <img src="local file"> with a data URI, to keep the output self-contained."""
+    def embed(m):
+        path = directory / m.group(2)
+        mime = IMAGE_TYPES.get(path.suffix.lower())
+        if re.match(r"(https?|data):", m.group(2)) or not mime:
+            return m.group(0)
+        if not path.exists():
+            sys.exit(f"missing image: {path}")
+        return f'{m.group(1)}{data_uri(path, mime)}"'
+    return re.sub(r'(<img\b[^>]*?\bsrc=")([^"]+)"', embed, text)
 
 
 # ------------------------------------------------------------------ page
@@ -325,6 +346,13 @@ footer { position: absolute; right: 48px; bottom: 18px; font-size: 14px; color: 
 .title .fit h3 { margin: 0 0 10px; font-size: 16px; }
 .title .fit p { font-size: 26px; line-height: 1.5; }
 .title footer { display: none; }
+
+/* <figure class="qr"><img src="..."><figcaption>..</figcaption></figure>:
+   a QR code with a caption, on the right side of the slide */
+.slide figure.qr { position: absolute; right: 72px; top: 150px; width: 250px; margin: 0; text-align: center; }
+.slide figure.qr img { display: block; width: 100%; padding: 12px; border: 5px solid var(--red);
+  border-radius: 16px; background: #fff; }
+.slide figure.qr figcaption { margin-top: 12px; font-size: 24px; font-weight: 600; color: #fff; }
 
 /* closing slide: a regular slide over a photo, darkened so that the text stays readable */
 .closing { background-size: cover; background-position: center;

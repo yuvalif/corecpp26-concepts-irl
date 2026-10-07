@@ -4,5 +4,5 @@
 * ~2M lines of C++ code in ~4.5K C++ source/header files (excluding submodules)
 * Has ~1,500 contributors from many organizations
 * Deployed in ~3.7K clusters / ~1.7 exabytes
-* e.g. CERN runs more than 100 petabytes of Ceph storage
+* E.g. CERN runs more than 100 petabytes of Ceph storage
 

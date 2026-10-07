@@ -84,7 +84,7 @@ accept  application/json
 
 ## Slide 6.6: Why It Loops
 
-* `find("accept")` returns the first "accept". The next entry is the second one.
+* Call to `find("accept")` returns the first "accept". The next entry is the second one.
 * Its key is also "accept". So `find()` goes back to the first...
 * It compiles, and it passes every test that has no duplicate keys
 * Same with `std::multiset`
@@ -95,7 +95,7 @@ accept  application/json
 
 "Stateless iteration needs unique keys"
 <br>
-the standard containers already tell us which is which:
+The standard containers already tell us which is which:
 
 ```cpp
 std::map<K, V>::insert(value)       // returns std::pair<iterator, bool>

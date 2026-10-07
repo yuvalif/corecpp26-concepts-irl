@@ -33,7 +33,7 @@ plain.find(std::string{key});    // compiles; allocates a temporary
 headers.find(key);               // compiles; no temporary
 ```
 <br>
-`std::less<>` is the transparent comparator that comes with the standard library
+The `std::less<>` class is the transparent comparator that comes with the standard library
 
 ---
 

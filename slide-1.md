@@ -1,15 +1,15 @@
 # What (I Was Thinking) Concepts Are Good For?
 
-* making error messages on templates more human readable
-* giving cool talks in C++ conferences
+* Making error messages on templates more human readable
+* Giving cool talks in C++ conferences
 
 ---
 
-## Slide 1.1: A Template with an Unwritten Contract
+## Slide 1.1: A Template with an Unwritten Requirements
 
 Exposing a C++ container to Lua scripts:
 <br>
-the library needs four static functions from the type
+The library needs four static functions from the type
 
 ```cpp
 // lua_utils.h
@@ -44,11 +44,11 @@ struct HTTPRequestHeadersMetaTable {
 create_metatable<HTTPRequestHeadersMetaTable>(L);
 ```
 <br>
-The contract lives in a comment
+The requirements lives in a comment
 
 ---
 
-## Slide 1.3: The Same Contract, as a Concept
+## Slide 1.3: The Same Requirements, as a Concept
 
 ```cpp
 template <typename T>
@@ -91,5 +91,5 @@ lua_utils.h:9:8: note: because 'T::PairsClosure(L)' would be invalid:
 ```
 
 * The error moved from the library's implementation to **my** line of code
-* It names the contract that was broken, not the statement that happened to trip
+* It names the requirement that was broken, not the statement that happened to trip
 * Nicer. But is it worth touching working code for?

@@ -5,6 +5,7 @@ Usage:
     ./render.py               # reads ./slide-*.md, writes ./slides.html
     ./render.py -o talk.html  # different output file
     ./render.py --no-notes    # leave the speaker notes out of the file
+    ./render.py --title ceph  # Ceph photo on the title slide, not the conference one
 
 Requires: python3 with the "markdown" and "pygments" packages
     (dnf install python3-markdown python3-pygments, or pip install markdown pygments)
@@ -15,6 +16,8 @@ Markdown conventions:
   * the first heading of a slide is its title; a "Slide 4.1.2:" prefix is
     dropped, and "(Backup)" in the prefix marks the slide as a backup slide
   * a blockquote starting with "> Notes" holds the speaker notes
+  * a line "<!-- photo: assets/some.jpg -->" puts that photo, darkened, behind
+    the slide
   * <img src="local file"> is embedded in the output; inside
     <figure class="qr"> it is placed on the right side of the slide, with
     its <figcaption> below it
@@ -48,12 +51,16 @@ except ImportError as e:
 HERE = Path(__file__).resolve().parent
 ASSETS = HERE / "assets"
 LOGO = ASSETS / "ceph-logo.svg"
-TITLE_PHOTO = ASSETS / "photo-title.jpg"
+TITLE_PHOTOS = {
+    "conference": ASSETS / "corecpp-title.jpg",  # title slide of the Core C++ 2026 slides master
+    "ceph": ASSETS / "photo-title.jpg",
+}
 CLOSING_PHOTO = ASSETS / "photo-closing.jpg"
 
 FENCE = re.compile(r"^(```+|~~~+)\s*([\w+-]*)\s*$")
 HEADING = re.compile(r"^(#{1,6})\s+(.*?)\s*$")
 SLIDE_PREFIX = re.compile(r"^Slide\s+[\d.]+\s*(\((?P<tag>[^)]*)\))?\s*:\s*", re.I)
+PHOTO = re.compile(r"^<!--\s*photo:\s*(\S+)\s*-->\s*$")
 BARE_URL = re.compile(r"(?<![<(\[`\w])(https?://[^\s<>)]+)")
 STRIKE = re.compile(r"~~(.+?)~~")
 
@@ -177,14 +184,16 @@ def inline(text):
     return re.sub(r"^<p>|</p>$", "", out.strip())
 
 
-def build_slides(files, with_notes=True):
+def build_slides(files, with_notes=True, title_style="conference"):
     slides = []
     for file_index, path in enumerate(files):
         for slide_index, lines in enumerate(split_slides(path.read_text())):
             lines, notes = extract_notes(lines)
+            photo = next((m.group(1) for m in map(PHOTO.match, lines) if m), None)
+            lines = [line for line in lines if not PHOTO.match(line)]
             level, title, tag, body = extract_title(lines)
             if slide_index == 0 and file_index == 0:
-                kind = "title"
+                kind = "title conference" if title_style == "conference" else "title"
             elif level == 1:
                 kind = "section"
             else:
@@ -197,6 +206,7 @@ def build_slides(files, with_notes=True):
                     render_markdown(body, line_breaks=file_index in (0, len(files) - 1)), path.parent),
                 "notes": render_markdown(notes.splitlines()) if with_notes and notes else "",
                 "source": path.name,
+                "photo": path.parent / photo if photo else None,
             })
     if len(slides) > 1:
         slides[-1]["kind"] += " closing"  # the last slide of the talk
@@ -209,8 +219,15 @@ def slide_html(slide, number, total, logo):
     title = inline(slide["title"]) if slide["title"] else ""
     heading = f"<h1>{title}{badge}</h1>" if title else ""
     notes = f'<aside class="notes">{slide["notes"]}</aside>' if slide["notes"] else ""
+    style = ""
+    if slide["photo"]:
+        mime = IMAGE_TYPES.get(slide["photo"].suffix.lower())
+        if not mime or not slide["photo"].exists():
+            sys.exit(f"{slide['source']}: missing or unsupported photo: {slide['photo']}")
+        classes += " photo"
+        style = f' style="--photo: url({data_uri(slide["photo"], mime)})"'
     return f"""
-<section class="{classes}" data-source="{slide['source']}" data-title="{html.escape(slide['title'].replace('`', ''), quote=True)}">
+<section class="{classes}"{style} data-source="{slide['source']}" data-title="{html.escape(slide['title'].replace('`', ''), quote=True)}">
   <div class="logo">{logo}</div>
   <header>{heading}</header>
   <div class="body"><div class="fit">{slide['body']}</div></div>
@@ -347,12 +364,29 @@ footer { position: absolute; right: 48px; bottom: 18px; font-size: 14px; color: 
 .title .fit p { font-size: 26px; line-height: 1.5; }
 .title footer { display: none; }
 
+/* title slide in the style of the conference's slides master: its background already carries the
+   conference logo, name and dates; the talk title and the speaker go in the middle */
+.title.conference { padding: 150px 96px 60px; align-items: center; text-align: center;
+  background-image: var(--photo-title); font-family: "Open Sans", var(--font); }
+.title.conference .logo { top: 34px; right: 48px; left: auto; width: 104px; }
+.title.conference h1, .title.conference .fit h2, .title.conference .fit p {
+  color: #fff; text-shadow: 0 3px 10px rgba(0, 0, 0, 0.75), 0 0 2px rgba(0, 0, 0, 0.6); }
+.title.conference h1 { font-size: 96px; font-weight: 700; letter-spacing: 0; margin: 0 0 14px; }
+.title.conference .fit h2 { font-size: 34px; font-weight: 600; margin: 0 0 44px; }
+.title.conference .fit h3 { display: none; }
+.title.conference .fit p { font-size: 46px; font-weight: 700; line-height: 1.3; margin: 0; }
+
 /* <figure class="qr"><img src="..."><figcaption>..</figcaption></figure>:
    a QR code with a caption, on the right side of the slide */
 .slide figure.qr { position: absolute; right: 72px; top: 150px; width: 250px; margin: 0; text-align: center; }
 .slide figure.qr img { display: block; width: 100%; padding: 12px; border: 5px solid var(--red);
   border-radius: 16px; background: #fff; }
 .slide figure.qr figcaption { margin-top: 12px; font-size: 24px; font-weight: 600; color: #fff; }
+
+/* a slide with a "<!-- photo: file -->" line: a regular slide over that photo, darkened */
+.photo { background-size: cover; background-position: center;
+  background-image: linear-gradient(90deg, hsla(237, 74%, 13%, 0.93) 0%, hsla(237, 74%, 13%, 0.88) 60%,
+  hsla(237, 74%, 16%, 0.7) 100%), var(--photo); }
 
 /* closing slide: a regular slide over a photo, darkened so that the text stays readable */
 .closing { background-size: cover; background-position: center;
@@ -508,7 +542,7 @@ PAGE = """<!doctype html>
 <title>{title}</title>
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" media="print" onload="this.onload=null;this.removeAttribute('media');"
-      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap">
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&family=Open+Sans:wght@600;700&display=swap">
 <style>
 :root {{ --photo-title: url({photo_title}); --photo-closing: url({photo_closing}); }}
 {css}
@@ -532,16 +566,19 @@ def main():
     parser.add_argument("-d", "--dir", type=Path, default=HERE, help="directory holding the slide-*.md files")
     parser.add_argument("-o", "--output", type=Path, default=None, help="output file (default: <dir>/slides.html)")
     parser.add_argument("--no-notes", action="store_true", help="do not include the speaker notes")
+    parser.add_argument("--title", choices=sorted(TITLE_PHOTOS), default="conference",
+                        help="style of the title slide (default: conference)")
     args = parser.parse_args()
 
     files = slide_files(args.dir)
     if not files:
         sys.exit(f"no slide-*.md files in {args.dir}")
-    for asset in (LOGO, TITLE_PHOTO, CLOSING_PHOTO):
+    title_photo = TITLE_PHOTOS[args.title]
+    for asset in (LOGO, title_photo, CLOSING_PHOTO):
         if not asset.exists():
             sys.exit(f"missing asset: {asset}")
 
-    slides = build_slides(files, with_notes=not args.no_notes)
+    slides = build_slides(files, with_notes=not args.no_notes, title_style=args.title)
     logo = re.sub(r"<title>.*?</title>", "", LOGO.read_text()).strip()
     body = "\n".join(slide_html(s, i + 1, len(slides), logo) for i, s in enumerate(slides))
     title = re.sub(r"<[^>]+>", "", inline(slides[0]["title"])) or "Slides"
@@ -549,7 +586,7 @@ def main():
     output = args.output or args.dir / "slides.html"
     output.write_text(PAGE.format(
         title=html.escape(title),
-        photo_title=data_uri(TITLE_PHOTO, "image/jpeg"),
+        photo_title=data_uri(title_photo, "image/jpeg"),
         photo_closing=data_uri(CLOSING_PHOTO, "image/jpeg"),
         css=CSS, slides=body, js=JS))
     print(f"{output}: {len(slides)} slides from {len(files)} files, {output.stat().st_size // 1024} KB")

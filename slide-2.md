@@ -1,4 +1,5 @@
 # A Little Bit About Ceph
+<!-- photo: assets/photo-title.jpg -->
 
 * Open Source project started in 2004 (open sourced in 2006)
 * ~2M lines of C++ code in ~4.5K C++ source/header files (excluding submodules)

@@ -31,15 +31,16 @@ int next(lua_State* L) {
   auto& m = get_table<Map>(L);             // stored as opaque user data
   auto it = m.begin();
   if (!lua_isnil(L, 2)) {                  // nil key marks the start of the loop
-    it = m.find(lua_tostring(L, 2));       // find the key we returned last time
+    const char* key = lua_tostring(L, 2);  // get the input "key" parameter
+    it = m.find(key);                      // find the key we returned last time
     if (it != m.end()) ++it;               // ... and step to the one after it
   }
   if (it == m.end()) {                     // in Lua you push values to a stack to return them
     lua_pushnil(L);                        // end of the loop: return nil key
     lua_pushnil(L);                        // return nil value
   } else {
-    lua_pushstring(L, it->first.c_str());  // return the key
-    lua_pushstring(L, it->second.c_str()); // return the value
+    lua_pushstring(L, it->first.c_str());  // return the next key
+    lua_pushstring(L, it->second.c_str()); // return the next value
   }
   return 2;                                // returning 2 things: key, value
 }
@@ -47,15 +48,7 @@ int next(lua_State* L) {
 
 ---
 
-## Slide 6.3: Why Not Keep a C++ Iterator Between the Calls?
-
-* The script may never finish the loop (`break`, error): who releases the iterator?
-* The script may change the container in the middle of the loop: the iterator is invalid
-* A key is just a value. It has no lifetime and cannot dangle.
-
----
-
-## Slide 6.4: The Infinite Loop
+## Slide 6.3: The Infinite Loop
 
 Now we use the template with a container that allows duplicate keys:
 
@@ -70,8 +63,16 @@ expose(L, "RequestHeaders", unlucky_headers);   // pairs() will use next<multima
 
 ---
 
-## Slide 6.5: The Script Never Returns
+## Slide 6.4: The Script Never Returns
 
+The Lua code:
+```lua
+for key, value in pairs(RequestHeaders) do
+  print(key, value)
+end
+```
+
+What it prints:
 ```
 accept  text/html
 accept  application/json
@@ -82,16 +83,18 @@ accept  application/json
 
 ---
 
-## Slide 6.6: Why It Loops
+## Slide 6.5: Why It Loops
 
-* Call to `find("accept")` returns the first "accept". The next entry is the second one.
+* The first call gets the first element: ("accept", "text/html")
+* And returns the "accept" key
+* The next call finds the "accept" key and returns the 2nd element: ("accept", "application/json")
 * Its key is also "accept". So `find()` goes back to the first...
 * It compiles, and it passes every test that has no duplicate keys
 * Same with `std::multiset`
 
 ---
 
-## Slide 6.7: Make It a Compile Time Error
+## Slide 6.6: Make It a Compile Time Error
 
 "Stateless iteration needs unique keys"
 <br>
@@ -99,12 +102,12 @@ The standard containers already tell us which is which:
 
 ```cpp
 std::map<K, V>::insert(value)       // returns std::pair<iterator, bool>
-std::multimap<K, V>::insert(value)  // returns iterator
+std::multimap<K, V>::insert(value)  // returns iterator: no boolean, no failure on duplicate keys
 ```
 
 ---
 
-## Slide 6.8: The `unique_keys` Concept
+## Slide 6.7: The `unique_keys` Concept
 
 ```cpp
 template <typename C>
@@ -121,7 +124,7 @@ void expose(lua_State* L, const char* name, Map& m);
 
 ---
 
-## Slide 6.9: Compile Time Error vs. Infinite Loop
+## Slide 6.8: Compile Time Error vs. Infinite Loop
 
 ```
 error: no matching function for call to 'expose'

@@ -36,28 +36,28 @@ std::enable_if_t<has_encode<T>::value>
 encode(const T& v, bufferlist& bl) { v.encode(bl); }
 
 // vector of anything: one element at a time
-template <typename T, typename A>
+template <typename T>
 #ifdef FORGOT_NOT
-std::enable_if_t<true>
+void
 #else
 std::enable_if_t<!std::is_arithmetic_v<T>>  // <-- note the ! sign
 #endif
-encode(const std::vector<T, A>& v, bufferlist& bl) {
+encode(const std::vector<T>& v, bufferlist& bl) {
   encode(uint32_t(v.size()), bl);
   for (const auto& e : v) encode(e, bl);
 }
 
 // vector of numbers: one copy
-template <typename T, typename A>
+template <typename T>
 std::enable_if_t<std::is_arithmetic_v<T>>
-encode(const std::vector<T, A>& v, bufferlist& bl) {
+encode(const std::vector<T>& v, bufferlist& bl) {
   encode(uint32_t(v.size()), bl);
   bl.append(v.data(), v.size() * sizeof(T));
 }
 
 // ... and again for every other container: here is list
-template <typename T, typename A>
-void encode(const std::list<T, A>& l, bufferlist& bl) {
+template <typename T>
+void encode(const std::list<T>& l, bufferlist& bl) {
   encode(uint32_t(l.size()), bl);
   for (const auto& e : l) encode(e, bl);
 }

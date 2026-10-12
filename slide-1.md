@@ -5,7 +5,7 @@
 
 ---
 
-## Slide 1.1: A Template with an Unwritten Requirements
+## Slide 1.1: A Template with Unwritten Requirements
 
 Exposing a C++ container to Lua scripts:
 <br>
@@ -14,15 +14,15 @@ The library needs four static functions from the type
 ```cpp
 // lua_utils.h
 //
-// MetaTable is expected to be a class with the following members:
+// M is expected to be a class with the following members:
 //   IndexClosure, NewIndexClosure, PairsClosure, LenClosure
 //   (static functions that accept "lua_State*" and return "int")
-template <typename MetaTable>
+template <typename M>
 void create_metatable(lua_State* L) {
-  set_handler(L, "__index",    MetaTable::IndexClosure);
-  set_handler(L, "__newindex", MetaTable::NewIndexClosure);
-  set_handler(L, "__pairs",    MetaTable::PairsClosure);
-  set_handler(L, "__len",      MetaTable::LenClosure);
+  set_handler(L, "__index",    M::IndexClosure);    // <-- expecting M::IndexClosure static member
+  set_handler(L, "__newindex", M::NewIndexClosure); // <-- expecting M::NewIndexClosure static member
+  set_handler(L, "__pairs",    M::PairsClosure);    // <-- expecting M::PairsClosure static member
+  set_handler(L, "__len",      M::LenClosure);      // <-- expecting M::LenClosure static member
 }
 ```
 
@@ -41,14 +41,27 @@ struct HTTPRequestHeadersMetaTable {
   // oops: forgot PairsClosure
 };
 
+// trying to create a metatable of type HTTPRequestHeadersMetaTable
 create_metatable<HTTPRequestHeadersMetaTable>(L);
 ```
 <br>
-The requirements lives in a comment
+The requirements on the struct live in a comment
 
 ---
 
-## Slide 1.3: The Same Requirements, as a Concept
+## Slide 1.3: The Error Message
+
+```
+lua_utils.h:8:35: error: no member named 'PairsClosure' in 'HTTPRequestHeadersMetaTable'
+    8 |   set_handler(L, "__pairs",    M::PairsClosure);
+      |                                ~~~^
+http_request_headers.cc:11:3: note: in instantiation of function template specialization
+                 'create_metatable<HTTPRequestHeadersMetaTable>' requested here
+```
+
+---
+
+## Slide 1.4: The Same Requirements, as a Concept
 
 ```cpp
 template <typename T>
@@ -59,23 +72,15 @@ concept lua_metatable = requires(lua_State* L) {
   { T::LenClosure(L) }      -> std::same_as<int>;
 };
 
-template <lua_metatable MetaTable>
-void create_metatable(lua_State* L);
+template <lua_metatable M>
+void create_metatable(lua_State* L); // <-- same implementation as before
+
+// trying to create a metatable of type HTTPRequestHeadersMetaTable
+// still failing, but with a better error message
+create_metatable<HTTPRequestHeadersMetaTable>(L);
 ```
 <br>
 The comment is now code
-
----
-
-## Slide 1.4: The Error Message, without a Concept
-
-```
-lua_utils.h:8:43: error: no member named 'PairsClosure' in 'HTTPRequestHeadersMetaTable'
-    8 |   set_handler(L, "__pairs",    MetaTable::PairsClosure);
-      |                                ~~~~~~~~~~~^
-http_request_headers.cc:11:3: note: in instantiation of function template specialization
-                 'create_metatable<HTTPRequestHeadersMetaTable>' requested here
-```
 
 ---
 
@@ -90,6 +95,8 @@ lua_utils.h:9:8: note: because 'T::PairsClosure(L)' would be invalid:
                  no member named 'PairsClosure' in 'HTTPRequestHeadersMetaTable'
 ```
 
-* The error moved from the library's implementation to **my** line of code
+* The error moved from the library's implementation to the line of code where the problem occurred
 * It names the requirement that was broken, not the statement that happened to trip
-* Nicer. But is it worth touching working code for?
+<br>
+<br>
+### Nicer. But is it worth touching working code for?

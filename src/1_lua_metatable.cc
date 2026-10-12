@@ -27,18 +27,18 @@ concept lua_metatable = requires(lua_State* L) {
   { T::LenClosure(L) }      -> std::same_as<int>;
 };
 
-template <lua_metatable MetaTable>
+template <lua_metatable M>
 #else
-// MetaTable is expected to be a class with the following members:
+// M is expected to be a class with the following members:
 //   IndexClosure, NewIndexClosure, PairsClosure, LenClosure
 //   (static functions that accept "lua_State*" and return "int")
-template <typename MetaTable>
+template <typename M>
 #endif
 void create_metatable(lua_State* L) {
-  set_handler(L, "__index",    MetaTable::IndexClosure);
-  set_handler(L, "__newindex", MetaTable::NewIndexClosure);
-  set_handler(L, "__pairs",    MetaTable::PairsClosure);
-  set_handler(L, "__len",      MetaTable::LenClosure);
+  set_handler(L, "__index",    M::IndexClosure);
+  set_handler(L, "__newindex", M::NewIndexClosure);
+  set_handler(L, "__pairs",    M::PairsClosure);
+  set_handler(L, "__len",      M::LenClosure);
 }
 
 // --- the user of the library

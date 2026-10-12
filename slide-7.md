@@ -1,17 +1,5 @@
-# The Problem Domain
-
-Solves one specific problem for a very diverse set of types:
-
-## a serialization library
-Used by all Ceph code that needs to write data to disk or network
-
-## Lua bindings
-Expose internal types to scripts running inside Ceph's Object Store frontend
-
----
-
-## Slide 7.1: Non-Intrusive Solution *(\*)*
-<br>
+# What (I Now Think) Concepts Are Good For
+## Non-Intrusive Solution *(\*)* for a Complex Type System *(\*\*)*
 #### The class hierarchy says what a type ***is***.<br>&emsp;&emsp;A concept says what we can ***do*** with it
 #### The types did not change.<br>&emsp;&emsp;No base class was added
 <br>
@@ -22,3 +10,4 @@ Expose internal types to scripts running inside Ceph's Object Store frontend
 <br>
 *(\*) no type was hurt in the making of these slides*
 
+*(\*\*) serializeable types and types with Lua bindings*

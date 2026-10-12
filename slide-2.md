@@ -1,4 +1,4 @@
-# A Little Bit About Ceph
+# Ceph Is a Large and Complex Codebase
 <!-- photo: assets/photo-title.jpg -->
 
 * Open Source project started in 2004 (open sourced in 2006)
@@ -7,3 +7,4 @@
 * Deployed in ~3.7K clusters / ~1.7 exabytes
 * E.g. CERN runs more than 100 petabytes of Ceph storage
 
+### Need a better reason to change Ceph's code than <br> "more readable compilation errors"

@@ -1,7 +1,9 @@
-# Was Really Wrong - Runtime Performance Improvement
+# I Was Really Wrong
+## Runtime Performance Improvement Made Feasible
 
 * A concept is a question about a type that the compiler answers
 * Ask the right question, and you can choose a faster implementation
+* Without concepts it is a trade-off between speed and code complexity
 
 ---
 
@@ -10,8 +12,10 @@
 Can compare a key with something that is not a key
 
 ```cpp
+// case insensitive comparator that works on string views
 struct no_case_less {
-  using is_transparent = void;   // marking it as transparent
+  using is_transparent = void;   // <-- this tells std::map to enable this overload:
+                                 //     template <typename K> iterator find(const K& k);
   bool operator()(std::string_view a, std::string_view b) const {
     return std::ranges::lexicographical_compare(a, b, {}, ::tolower, ::tolower);
   }
@@ -26,11 +30,11 @@ std::map<std::string, std::string, no_case_less> headers;
 ## Slide 5.2: Looking for a C String Coming from Lua
 
 ```cpp
-std::string_view key = lua_tostring(L, 2);
+std::string_view key = lua_tostring(L, 2); // <-- Lua returns a C-string
 
-plain.find(key);                 // does not compile
-plain.find(std::string{key});    // compiles; allocates a temporary
-headers.find(key);               // compiles; no temporary
+plain.find(key);                           // <-- does not compile
+plain.find(std::string{key});              // <-- compiles; allocates a temporary
+headers.find(key);                         // <-- compiles; no temporary
 ```
 <br>
 The `std::less<>` class is the transparent comparator that comes with the standard library

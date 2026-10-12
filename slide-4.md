@@ -1,6 +1,7 @@
-# I Was Somewhat Wrong - Serialization Library
+# I Was Somewhat Wrong
+## Serialization Library
 
-Every Ceph type that goes to disk or over the network is 
+Every Ceph type that goes to disk or over the network is
 <br>
 serialized with a free function `encode(value, buffer)`,
 <br>
@@ -10,7 +11,9 @@ and that includes any container of any such type.
 
 ---
 
-## Slide 4.1: Detecting a Member Function
+## Slide 4.1: Encodable Types
+
+Detecting if a type has an `encode(bufferlist&)` member:
 
 ```cpp
 // primary template: "no"
@@ -24,20 +27,23 @@ struct has_encode<T, std::void_t<decltype(
   : std::true_type {};
 ```
 
+Using it: `encode()` for the types that have it:
+
+```cpp
+template <typename T>
+std::enable_if_t<has_encode<T>::value>
+encode(const T& v, bufferlist& bl) { v.encode(bl); }
+```
+
 ---
 
-## Slide 4.2: Numeric and Self-Encoding Types
+## Slide 4.2: Numeric Types
 
 ```cpp
 // numbers: copy the bytes
 template <typename T>
 std::enable_if_t<std::is_arithmetic_v<T>>
 encode(const T& v, bufferlist& bl);
-
-// classes that know how to encode themselves
-template <typename T>
-std::enable_if_t<has_encode<T>::value>          // the detector from 4.1
-encode(const T& v, bufferlist& bl) { v.encode(bl); }
 ```
 
 ---
@@ -46,9 +52,9 @@ encode(const T& v, bufferlist& bl) { v.encode(bl); }
 
 ```cpp
 // vector of anything: one element at a time
-template <typename T, typename A>
+template <typename T>
 std::enable_if_t<!std::is_arithmetic_v<T>>  // <-- note the ! sign
-encode(const std::vector<T, A>& v, bufferlist& bl) {
+encode(const std::vector<T>& v, bufferlist& bl) {
   encode(uint32_t(v.size()), bl);
   for (const auto& e : v) encode(e, bl);
 }
@@ -60,25 +66,34 @@ encode(const std::vector<T, A>& v, bufferlist& bl) {
 
 ```cpp
 // vector of numbers: one copy
-template <typename T, typename A>
+template <typename T>
 std::enable_if_t<std::is_arithmetic_v<T>>
-encode(const std::vector<T, A>& v, bufferlist& bl);
-
-// ... and again for list, set, map, deque, optional, ...
-// ... and again for decode()
+encode(const std::vector<T>& v, bufferlist& bl);
 ```
 
 ---
 
-## Slide 4.5: Why It's a Headache
+## Slide 4.5: Why the `!` Is There
 
-* Every pair of overloads must be made mutually exclusive **by hand**
-* Forget one `!` and you get: `error: call to 'encode' is ambiguous`
-* The condition hides in the return type; the same loop is written once per container
+Take the `!` away, and both overloads accept a vector of numbers:
+
+```cpp
+template <typename T>                       // vector of anything
+void encode(const std::vector<T>& v, bufferlist& bl);
+
+template <typename T>
+std::enable_if_t<std::is_arithmetic_v<T>>   // vector of numbers
+encode(const std::vector<T>& v, bufferlist& bl);
+
+encode(std::vector<Bucket>{}, bl);   // OK: only the first one matches
+encode(std::vector<int>{}, bl);      // error: call to 'encode' is ambiguous
+```
+
+The compiler cannot tell that one overload is a special case of the other
 
 ---
 
-## Slide 4.6: Basic Encoding Concepts
+## Slide 4.6: Encodable Type Concept
 
 ```cpp
 template <typename T>
@@ -101,12 +116,15 @@ concept encodable = requires(const T& v, bufferlist& bl) { encode(v, bl); };
 ```cpp
 template <typename R>
 concept encodable_range =
-  std::ranges::sized_range<R> && encodable<std::ranges::range_value_t<R>>;
+  std::ranges::sized_range<R> &&            // <-- it's a range that knows its size
+  encodable<std::ranges::range_value_t<R>>; // <-- its elements are encodable
+  // no need to mention it's *not* a raw_bytes_range
 
 template <typename R>
 concept raw_bytes_range =
-  encodable_range<R> && std::ranges::contiguous_range<R> &&
-  raw_bytes<std::ranges::range_value_t<R>>;
+  encodable_range<R> &&                     // <-- it's an encodable range
+  std::ranges::contiguous_range<R> &&       // <-- it's a contiguous range
+  raw_bytes<std::ranges::range_value_t<R>>; // <-- it holds numeric values
 ```
 
 ---
@@ -126,26 +144,17 @@ void encode(const raw_bytes_range auto& r, bufferlist& bl);
 
 ---
 
-## Slide 4.9: Why It's a Breeze
-
-* No negations: `raw_bytes_range` is *more constrained* than `encodable_range`, so the compiler picks it
-* One loop serves `vector`, `list`, `set`, `map`, ... and containers of containers
-* The requirements self document the code
-
----
-
-## Slide 4.10: Bonus: When a Type Cannot Be Encoded
+## Slide 4.9: The Same Calls, with Concepts
 
 ```cpp
-struct Tenant { uint64_t id; };            // no encode()
+void encode(const encodable_range auto& r, bufferlist& bl);   // any container
+void encode(const raw_bytes_range auto& r, bufferlist& bl);   // contiguous numbers
 
-encode(std::vector<Tenant>{}, bl);
+encode(std::vector<Bucket>{}, bl);   // only the first one matches
+encode(std::vector<int>{}, bl);      // both match: the second one is chosen
 ```
 
-A concept can be tested right next to the type:
+`raw_bytes_range` is defined as `encodable_range && ...`,
+<br>
+so the compiler knows it is the special case
 
-```cpp
-static_assert(encodable<Tenant>);
-// error: static assertion failed
-// note: because 'Tenant' does not satisfy 'encodable'
-```

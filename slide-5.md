@@ -37,11 +37,13 @@ plain.find(std::string{key});              // <-- compiles; allocates a temporar
 headers.find(key);                         // <-- compiles; no temporary
 ```
 <br>
-The `std::less<>` class is the transparent comparator that comes with the standard library
+When I try to write generic code that work on any map of strings
+<br>
+I just allocate the temporary `std::string`
 
 ---
 
-## Slide 5.3: Look Up a `string_view` Without Creating a `std::string`
+## Slide 5.3: Look Up a `string_view`
 
 ```cpp
 template <typename Map>

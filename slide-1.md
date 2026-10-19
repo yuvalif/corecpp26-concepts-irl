@@ -49,7 +49,7 @@ The requirements on the struct live in a comment
 
 ---
 
-## Slide 1.3: The Error Message
+## Slide 1.3: The Error Message<sup>*</sup>
 
 ```
 lua_utils.h:8:35: error: no member named 'PairsClosure' in 'HTTPRequestHeadersMetaTable'
@@ -58,6 +58,8 @@ lua_utils.h:8:35: error: no member named 'PairsClosure' in 'HTTPRequestHeadersMe
 http_request_headers.cc:11:3: note: in instantiation of function template specialization
                  'create_metatable<HTTPRequestHeadersMetaTable>' requested here
 ```
+
+<p class="footnote">* Line numbers in compiler errors are those of the real code, not of the slides</p>
 
 ---
 

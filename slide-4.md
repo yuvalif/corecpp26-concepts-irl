@@ -37,18 +37,7 @@ encode(const T& v, bufferlist& bl) { v.encode(bl); }
 
 ---
 
-## Slide 4.2: Numeric Types
-
-```cpp
-// numbers: copy the bytes
-template <typename T>
-std::enable_if_t<std::is_arithmetic_v<T>>
-encode(const T& v, bufferlist& bl);
-```
-
----
-
-## Slide 4.3: Vectors
+## Slide 4.2: Vectors
 
 ```cpp
 // vector of anything: one element at a time
@@ -62,7 +51,14 @@ encode(const std::vector<T>& v, bufferlist& bl) {
 
 ---
 
-## Slide 4.4: Numeric Vectors
+## Slide 4.3: Numeric Types and Vectors
+
+```cpp
+// numbers: copy the bytes
+template <typename T>
+std::enable_if_t<std::is_arithmetic_v<T>>
+encode(const T& v, bufferlist& bl);
+```
 
 ```cpp
 // vector of numbers: one copy
@@ -73,7 +69,7 @@ encode(const std::vector<T>& v, bufferlist& bl);
 
 ---
 
-## Slide 4.5: Why the `!` Is There
+## Slide 4.4: Why the `!` Is There
 
 Take the `!` away, and both overloads accept a vector of numbers:
 
@@ -93,7 +89,7 @@ The compiler cannot tell that one overload is a special case of the other
 
 ---
 
-## Slide 4.6: Encodable Type Concept
+## Slide 4.5: Encodable Type Concept
 
 ```cpp
 template <typename T>
@@ -111,7 +107,7 @@ concept encodable = requires(const T& v, bufferlist& bl) { encode(v, bl); };
 
 ---
 
-## Slide 4.7: Range Concepts
+## Slide 4.6: Range Concepts
 
 ```cpp
 template <typename R>
@@ -129,7 +125,7 @@ concept raw_bytes_range =
 
 ---
 
-## Slide 4.8: Encoding Ranges
+## Slide 4.7: Encoding Ranges
 
 ```cpp
 // any container of anything encodable: one element at a time
@@ -144,7 +140,7 @@ void encode(const raw_bytes_range auto& r, bufferlist& bl);
 
 ---
 
-## Slide 4.9: The Same Calls, with Concepts
+## Slide 4.8: The Same Calls, with Concepts
 
 ```cpp
 void encode(const encodable_range auto& r, bufferlist& bl);   // any container

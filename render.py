@@ -6,6 +6,7 @@ Usage:
     ./render.py -o talk.html  # different output file
     ./render.py --no-notes    # leave the speaker notes out of the file
     ./render.py --title ceph  # Ceph photo on the title slide, not the conference one
+    ./render.py --no-line-numbers  # code without line numbers
 
 Requires: python3 with the "markdown" and "pygments" packages
     (dnf install python3-markdown python3-pygments, or pip install markdown pygments)
@@ -21,6 +22,8 @@ Markdown conventions:
   * <img src="local file"> is embedded in the output; inside
     <figure class="qr"> it is placed on the right side of the slide, with
     its <figcaption> below it
+  * code fences with a language (```cpp, ```lua) get line numbers; fences
+    without one are compiler / program output and get none
   * the first slide of the first file is the title slide, with a photo
     background; the last slide of the last file is a regular slide over a
     photo; in both files a new line is a line break
@@ -137,7 +140,14 @@ def extract_title(lines):
 
 # ------------------------------------------------------------- rendering
 
-def render_code(code, lang):
+def number_lines(out):
+    """Prefix each line of highlighted code with its number. pygments closes its
+    spans at the end of every line, so splitting on new lines is safe."""
+    return "\n".join(f'<span class="ln">{n}</span>{line}'
+                     for n, line in enumerate(out.split("\n"), 1))
+
+
+def render_code(code, lang, line_numbers=False):
     if not lang:
         # compiler / program output: highlight the words that matter
         out = html.escape(code)
@@ -148,12 +158,15 @@ def render_code(code, lang):
     try:
         lexer = get_lexer_by_name(lang, stripnl=False)
     except ClassNotFound:
-        return f'<pre class="code"><code>{html.escape(code)}</code></pre>'
+        out = html.escape(code)
+        return f'<pre class="code"><code>{number_lines(out) if line_numbers else out}</code></pre>'
     out = highlight(code, lexer, HtmlFormatter(nowrap=True)).rstrip("\n")
+    if line_numbers:
+        out = number_lines(out)
     return f'<pre class="code lang-{html.escape(lang)}"><code>{out}</code></pre>'
 
 
-def render_markdown(lines, line_breaks=False):
+def render_markdown(lines, line_breaks=False, line_numbers=False):
     """Markdown to HTML, with code fences highlighted by pygments."""
     blocks, text, i = [], [], 0
     while i < len(lines):
@@ -166,7 +179,7 @@ def render_markdown(lines, line_breaks=False):
                 i += 1
             i += 1
             text += ["", f"@@CODE{len(blocks)}@@", ""]
-            blocks.append(render_code("\n".join(code), lang))
+            blocks.append(render_code("\n".join(code), lang, line_numbers))
         else:
             line = STRIKE.sub(r"<del>\1</del>", lines[i])
             # bare URLs become links, except inside a line of raw HTML
@@ -179,12 +192,17 @@ def render_markdown(lines, line_breaks=False):
     return out
 
 
+def plain_title(title):
+    """A slide title as plain text: no footnote marks, tags or backticks."""
+    return re.sub(r"<sup>.*?</sup>|<[^>]+>|`", "", title).strip()
+
+
 def inline(text):
     out = markdown.markdown(text)
     return re.sub(r"^<p>|</p>$", "", out.strip())
 
 
-def build_slides(files, with_notes=True, title_style="conference"):
+def build_slides(files, with_notes=True, title_style="conference", line_numbers=True):
     slides = []
     for file_index, path in enumerate(files):
         for slide_index, lines in enumerate(split_slides(path.read_text())):
@@ -203,7 +221,8 @@ def build_slides(files, with_notes=True, title_style="conference"):
                 "title": title,
                 "tag": tag,
                 "body": embed_images(
-                    render_markdown(body, line_breaks=file_index in (0, len(files) - 1)), path.parent),
+                    render_markdown(body, line_breaks=file_index in (0, len(files) - 1),
+                                line_numbers=line_numbers), path.parent),
                 "notes": render_markdown(notes.splitlines()) if with_notes and notes else "",
                 "source": path.name,
                 "photo": path.parent / photo if photo else None,
@@ -227,7 +246,7 @@ def slide_html(slide, number, total, logo):
         classes += " photo"
         style = f' style="--photo: url({data_uri(slide["photo"], mime)})"'
     return f"""
-<section class="{classes}"{style} data-source="{slide['source']}" data-title="{html.escape(slide['title'].replace('`', ''), quote=True)}">
+<section class="{classes}"{style} data-source="{slide['source']}" data-title="{html.escape(plain_title(slide['title']), quote=True)}">
   <div class="logo">{logo}</div>
   <header>{heading}</header>
   <div class="body"><div class="fit">{slide['body']}</div></div>
@@ -323,6 +342,8 @@ pre.code { margin: 0 0 0.75em; padding: 0.85em 1.1em; border-radius: 10px; backg
   font-size: 0.74em; line-height: 1.42; tab-size: 2; }
 pre.code code { font-size: 1em; color: var(--grey-500); }
 pre.output { border-left-color: var(--red); background: hsl(237, 40%, 9%); }
+.ln { display: inline-block; width: 2ch; margin-right: 1.4ch; text-align: right; color: var(--grey-dim);
+  opacity: 0.6; font-style: normal; user-select: none; }
 .err { color: var(--red); font-weight: 600; }
 .nt { color: var(--blue-light); }
 
@@ -375,6 +396,11 @@ footer { position: absolute; right: 48px; bottom: 18px; font-size: 14px; color: 
 .title.conference .fit h2 { font-size: 34px; font-weight: 600; margin: 0 0 44px; }
 .title.conference .fit h3 { display: none; }
 .title.conference .fit p { font-size: 46px; font-weight: 700; line-height: 1.3; margin: 0; }
+
+/* <p class="footnote">: a small note at the bottom left of the slide, e.g. for a mark in the title */
+.fit p.footnote, .title.conference .fit p.footnote { position: absolute; left: 72px; bottom: 40px; margin: 0;
+  font-size: 22px; font-weight: 400; font-style: italic; color: var(--grey-300); text-align: left; }
+h1 sup { font-size: 0.45em; vertical-align: super; line-height: 0; }
 
 /* <figure class="qr"><img src="..."><figcaption>..</figcaption></figure>:
    a QR code with a caption, on the right side of the slide */
@@ -568,6 +594,7 @@ def main():
     parser.add_argument("--no-notes", action="store_true", help="do not include the speaker notes")
     parser.add_argument("--title", choices=sorted(TITLE_PHOTOS), default="conference",
                         help="style of the title slide (default: conference)")
+    parser.add_argument("--no-line-numbers", action="store_true", help="do not number the lines of code")
     args = parser.parse_args()
 
     files = slide_files(args.dir)
@@ -578,10 +605,11 @@ def main():
         if not asset.exists():
             sys.exit(f"missing asset: {asset}")
 
-    slides = build_slides(files, with_notes=not args.no_notes, title_style=args.title)
+    slides = build_slides(files, with_notes=not args.no_notes, title_style=args.title,
+                          line_numbers=not args.no_line_numbers)
     logo = re.sub(r"<title>.*?</title>", "", LOGO.read_text()).strip()
     body = "\n".join(slide_html(s, i + 1, len(slides), logo) for i, s in enumerate(slides))
-    title = re.sub(r"<[^>]+>", "", inline(slides[0]["title"])) or "Slides"
+    title = plain_title(slides[0]["title"]) or "Slides"
 
     output = args.output or args.dir / "slides.html"
     output.write_text(PAGE.format(

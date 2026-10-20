@@ -51,22 +51,17 @@ int next(lua_State* L) {
 
 ---
 
-## Slide 6.3: The Infinite Loop
+## Slide 6.3: The Script Never Returns
 
 Now we use the template with a container that allows duplicate keys:
-
 ```cpp
 std::multimap<std::string, std::string> unlucky_headers{
   {"accept", "text/html"},
   {"accept", "application/json"},
   {"host",   "ceph.io"}};
 
-expose(L, "RequestHeaders", unlucky_headers);   // pairs() will use next<multimap>
+expose(L, "RequestHeaders", unlucky_headers);   // pairs() will use next<std::multimap>
 ```
-
----
-
-## Slide 6.4: The Script Never Returns
 
 The Lua code:
 ```lua
@@ -86,7 +81,7 @@ accept  application/json
 
 ---
 
-## Slide 6.5: Make It a Compile Time Error
+## Slide 6.4: Make It a Compile Time Error
 
 "Stateless iteration needs unique keys"
 <br>
@@ -99,7 +94,7 @@ std::multimap<K, V>::insert(value)  // returns iterator: no boolean, no failure 
 
 ---
 
-## Slide 6.6: The `unique_keys` Concept
+## Slide 6.5: The `unique_keys` Concept
 
 ```cpp
 template <typename C>
@@ -116,7 +111,10 @@ void expose(lua_State* L, const char* name, Map& m);
 
 ---
 
-## Slide 6.7: Compile Time Error vs. Infinite Loop
+## Slide 6.6: Compile Time Error vs. Infinite Loop
+```cpp
+expose(L, "RequestHeaders", unlucky_headers);
+```
 
 ```
 error: no matching function for call to 'expose'
